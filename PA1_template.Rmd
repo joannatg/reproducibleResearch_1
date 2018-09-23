@@ -1,0 +1,161 @@
+
+---
+title: "Reproducible Research: Peer Assessment 1" 
+author: "Joanna Tyszkiewicz Georgescu"
+date: "September 21, 2018"
+output:
+  html_document: default
+  keep md: true
+---
+
+```{r setup, include=FALSE}
+chooseCRANmirror(graphics=FALSE, ind=1)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r echo=TRUE, include=FALSE}
+##Packages and libraries
+install.packages("tidyverse")
+install.packages("ggplot2")
+install.packages("mice")
+install.packages("timeDate")
+
+library(dplyr)
+library(mice)
+library(timeDate)
+library(ggplot2)
+```
+
+##1.Loading and preprocessing the data.
+###Download data from: https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip
+```{r echo = TRUE, include=FALSE}
+##Load data
+setwd("C:\\Users\\Joanna\\Desktop\\R_coursera\\5_2_2\\")
+path <- getwd()
+path
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(url, file.path(path, "data.zip"))
+unzip("data.zip")
+```
+
+##2. What is mean total number of steps taken per day?
+###Remove NAs, group by date and sum steps.
+
+```{r echo = TRUE, include=FALSE, results='hide', messaga=FALSE, warning=FALSE}
+##Remove NAs
+d <- read.csv("activity.csv", header = TRUE,  na.strings = c(" ",NA))
+na.omit(d)
+```
+```{r echo=TRUE, results='hide', include=TRUE}
+avg <- na.omit(d %>% group_by(date) %>% summarise(totalSteps = sum(steps)))
+```
+###Plot histogram of total steps.
+```{r echo=TRUE, results='asis', message=FALSE, warning=FALSE}
+##Histogram of steps
+qplot(avg$totalSteps, geom="histogram",
+      main = "Histogram of total number of steps taken", 
+      xlab = "Steps", 
+      ylab="Frequency",
+      fill=I("yellow"), 
+      col=I("red"))
+```
+
+
+```{r echo=TRUE, results='FALSE'}
+##Mean and median
+summary(avg)
+```
+
+###Mean: 10765
+###Median: 10766 
+
+##3. What is the average daily activity pattern?
+###Remove NAs, group by date and calculate average number of steps.
+```{r echo=TRUE, results='hide'}
+s <- na.omit(d %>% group_by(date) %>% summarise(avgSteps = mean(steps)))
+```
+###Time series plot.
+```{r}
+ggplot(s, aes(date, avgSteps)) + geom_point(na.rm=TRUE, color="blue", size=2) + 
+  theme(axis.text.x = element_text(angle=90))
+```
+
+###5-min interval with max # of steps
+```{r ech=TRUE, results='hide'} 
+d <- read.csv("activity.csv", header = TRUE,  na.strings = c(" ",NA))
+groupedByInterval <-na.omit(d %>% group_by(interval)) %>% summarise(totSteps = sum(steps))
+```
+
+```{r echo=TRUE, include=FALSE, results='hide', warning=FALSE, message=FALSE}
+head(arrange(groupedByInterval, -totSteps),1)
+```
+
+###Interval:835
+
+###totSteps: 10927
+
+
+##4. Imputing missing values.
+```{r  echo=TRUE, include=FALSE, results='hide'}
+##Imputing missing values
+d <- read.csv("activity.csv", header = TRUE,  na.strings = c(" ",NA))
+sapply(d, function(x) sum(is.na(x)))
+## structure
+str(d)
+##missing data patterns
+md.pattern(d)
+## impute (using CART)
+tempData <- mice(d, m=1, method='cart', printFlag=FALSE)
+summary(tempData)
+cleanData <- complete(tempData,1)
+cleanData
+summary(cleanData)
+##check missing data pattern
+md.pattern(cleanData)
+```
+
+
+###Histogram of steps (data with no missing values).
+
+```{r ech=TRUE, include=TRUE, results='asis'}
+qplot(cleanData$steps, geom="histogram",
+      binwidth = 50,
+      main = "Histogram of total number steps taken", 
+      xlab = "Steps", 
+      ylab="Frequency",
+      fill=I("red"), 
+      col=I("blue"))
+```
+
+
+##5. Are there differences in activity patterns between weekdays and weekends?
+
+```{r echo=TRUE, results='hide', include=TRUE}
+d <- read.csv("activity.csv", header = TRUE,  na.strings = c(" ",NA))
+na.omit(d)
+
+d$days <- ifelse(isWeekday(d$date) == TRUE, 1, 0)
+d
+summary(d)
+
+weekday <-d %>% filter(!is.na(steps)) %>% filter (days==1)
+weekdayAvg <-na.omit(weekday %>% group_by(interval)) %>% summarise(totSteps = sum(steps))
+weekend <- d %>% filter(!is.na(steps)) %>% filter (days==0)
+weekendAvg <-na.omit(weekend %>% group_by(interval)) %>% summarise(totSteps = sum(steps))
+summary(weekdayAvg)
+```
+
+``` {r echo=TRUE, include=TRUE, results='asis'}
+ggplot() + 
+  geom_line(data = weekdayAvg,  aes(x = interval, y = totSteps), color = "red") + 
+  geom_line(data = weekendAvg,  aes(x = interval, y = totSteps), color = "blue") +
+  labs(title="Histogram of avgerage number of steps over 5-minute interval")+ labs(subtitle="weekdays (red) vs. weekends (blue)")+
+  xlab('5-min Intervals') +
+  ylab('Avg. Steps')
+```
+
+
+
+
